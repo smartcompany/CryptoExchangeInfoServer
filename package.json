@@ -1,0 +1,13 @@
+{
+  "name": "coininfo-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

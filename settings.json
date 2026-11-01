@@ -1,0 +1,15 @@
+{
+  "ios_ads": [{ "initial_ad": 5 }, { "rewarded_ad": 1 }],
+  "android_ads": [{ "initial_ad": 5 }, { "rewarded_ad": 1 }],
+  "ref": {
+    "ios": {
+      "initial_ad": "ca-app-pub-3940256099942544/4411468910",
+      "rewarded_ad": "ca-app-pub-3940256099942544/1712485313"
+    },
+    "android": {
+      "initial_ad": "ca-app-pub-3940256099942544/1033173712",
+      "rewarded_ad": "ca-app-pub-3940256099942544/5224354917"
+    }
+  },
+  "down_load_url": "https://localhost"
+}
