@@ -1,3 +1,4 @@
+import { requireAppToken } from '../lib/auth.js';
 import { applyCors, handleOptions } from '../lib/cors.js';
 
 const LANGUAGE_NAMES = {
@@ -74,6 +75,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST, OPTIONS');
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  if (!requireAppToken(req, res)) return;
 
   const apiKey = process.env.GEMINI_API_KEY?.trim() ?? '';
   if (!apiKey) {
