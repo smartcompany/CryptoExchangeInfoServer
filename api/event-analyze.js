@@ -1,20 +1,37 @@
 import { applyCors, handleOptions } from '../lib/cors.js';
 
-const SYSTEM_PROMPT = `당신은 암호화폐 거래소 이벤트·공지를 초보 투자자에게 쉽게 풀어 설명하는 도우미입니다.
-투자 권유를 하지 마세요. 원문에 없는 보상·조건을 지어내지 마세요. 불확실하면 그렇다고 적으세요.
-반드시 JSON 객체만 반환하세요:
-{
-  "summary": "2~4문장 한국어 요약",
-  "reward": "보상 요약 (없으면 빈 문자열)",
-  "period": "기간 요약 (없으면 빈 문자열)",
-  "conditions": ["참여 조건 불릿"],
-  "cautions": ["주의점·지역/KYC/위험 불릿"]
-}`;
+const LANGUAGE_NAMES = {
+  en: 'English',
+  ko: 'Korean',
+  zh: 'Simplified Chinese',
+  ja: 'Japanese',
+};
 
-function pickText(ko, en) {
-  const a = typeof ko === 'string' ? ko.trim() : '';
-  if (a) return a;
-  return typeof en === 'string' ? en.trim() : '';
+function normalizeLanguage(raw) {
+  const code = String(raw ?? 'en')
+    .toLowerCase()
+    .split(/[_-]/)[0];
+  if (LANGUAGE_NAMES[code]) return code;
+  return 'en';
+}
+
+function buildSystemPrompt(language) {
+  const langName = LANGUAGE_NAMES[language] ?? 'English';
+  return `You explain crypto exchange events and announcements simply for beginners.
+Do not give investment advice. Do not invent rewards or conditions that are not in the source. If unsure, say so.
+Write EVERY string value in ${langName} only (language code: ${language}).
+Return a JSON object only:
+{
+  "summary": "2-4 sentence summary in ${langName}",
+  "reward": "reward summary in ${langName} (empty string if unknown)",
+  "period": "period summary in ${langName} (empty string if unknown)",
+  "conditions": ["participation requirement bullets in ${langName}"],
+  "cautions": ["cautions / region / KYC / risk bullets in ${langName}"]
+}`;
+}
+
+function asText(value) {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function parseJsonObject(text) {
@@ -43,7 +60,8 @@ function parseJsonObject(text) {
 
 /**
  * POST /api/event-analyze
- * Body: { exchange, title, titleKo, description, descriptionKo, tags, url, startDateTimestamp, endDateTimestamp }
+ * Body: { exchange, title, description, tags, url,
+ *         startDateTimestamp, endDateTimestamp, language }
  * Env: GEMINI_API_KEY (required)
  */
 const GEMINI_MODEL = 'gemini-3.5-flash-lite';
@@ -76,8 +94,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'invalid JSON body' });
   }
 
-  const title = pickText(payload.titleKo, payload.title);
-  const description = pickText(payload.descriptionKo, payload.description);
+  const language = normalizeLanguage(
+    payload.language ?? payload.locale ?? payload.lang,
+  );
+  const title = asText(payload.title);
+  const description = asText(payload.description);
   const exchange =
     typeof payload.exchange === 'string' ? payload.exchange.trim() : '';
   const url = typeof payload.url === 'string' ? payload.url.trim() : '';
@@ -89,13 +110,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'title is required' });
   }
 
-  const userPrompt = `거래소: ${exchange}
-제목: ${title}
-태그: ${tags.join(', ')}
-설명: ${description || '(없음)'}
-원문 URL: ${url}
-시작(ms): ${payload.startDateTimestamp ?? null}
-종료(ms): ${payload.endDateTimestamp ?? null}`;
+  const userPrompt = `Respond in ${LANGUAGE_NAMES[language]} (language=${language}).
+Exchange: ${exchange}
+Title: ${title}
+Tags: ${tags.join(', ')}
+Description: ${description || '(none)'}
+Source URL: ${url}
+Start (ms): ${payload.startDateTimestamp ?? null}
+End (ms): ${payload.endDateTimestamp ?? null}`;
 
   const endpoint = new URL(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
@@ -108,7 +130,7 @@ export default async function handler(req, res) {
       headers: { 'content-type': 'application/json; charset=utf-8' },
       body: JSON.stringify({
         systemInstruction: {
-          parts: [{ text: SYSTEM_PROMPT }],
+          parts: [{ text: buildSystemPrompt(language) }],
         },
         contents: [
           {
