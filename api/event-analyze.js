@@ -44,8 +44,10 @@ function parseJsonObject(text) {
 /**
  * POST /api/event-analyze
  * Body: { exchange, title, titleKo, description, descriptionKo, tags, url, startDateTimestamp, endDateTimestamp }
- * Env: GEMINI_API_KEY (required), GEMINI_MODEL (optional, default gemini-2.5-flash)
+ * Env: GEMINI_API_KEY (required)
  */
+const GEMINI_MODEL = 'gemini-3.5-flash-lite';
+
 export default async function handler(req, res) {
   applyCors(res);
   if (handleOptions(req, res)) return;
@@ -95,10 +97,8 @@ export default async function handler(req, res) {
 시작(ms): ${payload.startDateTimestamp ?? null}
 종료(ms): ${payload.endDateTimestamp ?? null}`;
 
-  const model =
-    process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
   const endpoint = new URL(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
   );
   endpoint.searchParams.set('key', apiKey);
 
@@ -127,21 +127,31 @@ export default async function handler(req, res) {
     const rawText = await geminiRes.text();
     if (!geminiRes.ok) {
       console.error('[event-analyze] Gemini HTTP', geminiRes.status, rawText);
-      return res
-        .status(500)
-        .json({ error: `Gemini HTTP ${geminiRes.status}` });
+      return res.status(500).json({
+        error: `Gemini HTTP ${geminiRes.status}`,
+        detail: clip(rawText),
+        model: GEMINI_MODEL,
+      });
     }
 
     let body;
     try {
       body = JSON.parse(rawText);
-    } catch {
-      return res.status(500).json({ error: 'Invalid Gemini response' });
+    } catch (parseError) {
+      console.error('[event-analyze] Invalid Gemini response', rawText);
+      return res.status(500).json({
+        error: 'Invalid Gemini response',
+        detail: clip(rawText),
+      });
     }
 
     const candidates = body.candidates ?? [];
     if (!candidates.length) {
-      return res.status(500).json({ error: 'Empty Gemini candidates' });
+      console.error('[event-analyze] Empty Gemini candidates', rawText);
+      return res.status(500).json({
+        error: 'Empty Gemini candidates',
+        detail: clip(rawText),
+      });
     }
 
     const parts = candidates[0]?.content?.parts ?? [];
@@ -151,12 +161,20 @@ export default async function handler(req, res) {
       .trim();
 
     if (!text) {
-      return res.status(500).json({ error: 'Empty Gemini text' });
+      console.error('[event-analyze] Empty Gemini text', rawText);
+      return res.status(500).json({
+        error: 'Empty Gemini text',
+        detail: clip(rawText),
+      });
     }
 
     const analysis = parseJsonObject(text);
     if (!analysis) {
-      return res.status(500).json({ error: 'Failed to parse Gemini JSON' });
+      console.error('[event-analyze] Failed to parse Gemini JSON', text);
+      return res.status(500).json({
+        error: 'Failed to parse Gemini JSON',
+        detail: clip(text),
+      });
     }
 
     return res.status(200).json({ analysis });
@@ -164,6 +182,12 @@ export default async function handler(req, res) {
     console.error('[event-analyze]', error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : String(error),
+      detail: error instanceof Error ? error.stack ?? error.message : String(error),
     });
   }
+}
+
+function clip(text, max = 2000) {
+  const value = typeof text === 'string' ? text : String(text ?? '');
+  return value.length > max ? `${value.slice(0, max)}…` : value;
 }
