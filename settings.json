@@ -13,5 +13,10 @@
       "rewarded_test": "ca-app-pub-3940256099942544/5224354917"
     }
   },
-  "down_load_url": "https://cryptoexchangeinfoserver.vercel.app/applink"
+  "down_load_url": "https://cryptoexchangeinfoserver.vercel.app/applink",
+  "referrals": {
+    "binance": "GRO_28502_DHEX0",
+    "bybit": "4LMVJ",
+    "okx": "LYPMI7KH"
+  }
 }

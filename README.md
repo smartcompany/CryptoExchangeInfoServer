@@ -8,7 +8,7 @@ Vercel에 배포된 Node API입니다.
 
 | Method | Path | 설명 |
 |--------|------|------|
-| `GET` | `/api/settings` | AdMob·다운로드 URL 등 앱 설정 |
+| `GET` | `/api/settings` | AdMob·다운로드 URL·거래소 레퍼럴 등 앱 설정 |
 | `POST` | `/api/event-analyze` | Gemini 기반 이벤트 분석 (`Bearer` 토큰 필요) |
 
 거래소 이벤트·Earn·이미지는 Flutter 앱이 거래소 공개 API를 직접 호출합니다.
@@ -21,3 +21,13 @@ Vercel에 배포된 Node API입니다.
 - `IOS_*` / `ANDROID_*` — AdMob 유닛 ID 덮어쓰기
 
 `POST /api/event-analyze`는 Bearer 토큰이 없으면 `401`입니다. Flutter는 `--dart-define=EXORA_API_TOKEN=...` 또는 기본값을 사용합니다.
+
+`settings.referrals` 예:
+
+```json
+"referrals": {
+  "binance": "GRO_28502_DHEX0",
+  "bybit": "4LMVJ",
+  "okx": "LYPMI7KH"
+}
+```
