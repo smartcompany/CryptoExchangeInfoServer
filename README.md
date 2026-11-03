@@ -28,6 +28,21 @@ Vercel에 배포된 Node API입니다.
 "referrals": {
   "binance": "GRO_28502_DHEX0",
   "bybit": "4LMVJ",
-  "okx": "LYPMI7KH"
+  "okx": "LYPMI7KH",
+  "gate": "VVUXULXECQ",
+  "mexc": "4E6ZD",
+  "bitget": "ZNUN2HX5",
+  "kucoin": "L2ZXN45F",
+  "coinbase": "SWD7NTZ"
+},
+"referral_links": {
+  "binance": "https://www.binance.com/join?ref=GRO_28502_DHEX0",
+  "bybit": "https://www.bybit.com/invite?ref=4LMVJ",
+  "okx": "https://www.okx.com/join/LYPMI7KH",
+  "gate": "https://www.gate.com/share/VVUXULXECQ",
+  "mexc": "https://s.mexc.com/referral/A3WQZcmWqu",
+  "bitget": "https://share.bitget.com/u/S6N2QMQN",
+  "kucoin": "https://www.kucoin.com/r/rf/L2ZXN45F",
+  "coinbase": "https://advanced.coinbase.com/join/SWD7NTZ?src=referral-link"
 }
 ```
