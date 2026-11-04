@@ -4,11 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vercel dev",
-    "start": "vercel dev",
+    "dev": "npx --yes vercel@latest dev",
+    "start": "node railway-server.js",
+    "railway": "node railway-server.js",
     "cf:dev": "wrangler dev",
-    "cf:deploy": "wrangler deploy"
+    "cf:deploy": "wrangler deploy",
+    "deploy:cf": "wrangler deploy"
   },
+  "dependencies": {},
   "devDependencies": {
     "wrangler": "^4.157.0"
   },

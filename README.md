@@ -6,6 +6,7 @@
 |--------|------|--------|
 | **Vercel** (기존) | Node API | `api/*.js` + `vercel.json` |
 | **Cloudflare Workers** | 동일 API의 Workers 런타임 | `workers/index.js` + `wrangler.toml` |
+| **Railway** | 상시 Node HTTP | `railway-server.js` (`npm start`) |
 
 **Vercel URL:** https://cryptoexchangeinfoserver.vercel.app  
 
@@ -18,6 +19,7 @@
 |--------|------|------|
 | `GET` | `/api/settings` | AdMob·다운로드 URL·거래소 레퍼럴 |
 | `POST` | `/api/event-analyze` | Gemini 이벤트 분석 (`Bearer` 필요) |
+| `GET` | `/privacy` | 개인정보 처리방침 (스토어 URL) |
 | `GET` | `/health` | Workers 헬스체크 |
 
 ## 환경 변수 / Secrets
@@ -43,9 +45,16 @@
 - 프로젝트 유형: **Worker**
 - Repository: 이 모노레포
 - **Root directory:** `server`
-- **Build command:** 비우거나 `npm install` (선택)
-- **Deploy command:** `npx wrangler deploy`  
-  (또는 `npm run cf:deploy`)
+- **Build command:** `npm install` (또는 비움)
+- **Deploy command:** `npx wrangler deploy` 또는 `npm run cf:deploy`  
+  (Workers에서는 `npm start`를 쓰지 마세요 — Railway용 상시 서버입니다)
+
+### Railway
+
+- **Root directory:** `server`
+- **Start command:** `npm start` → `node railway-server.js`
+- Variables: `EXORA_API_TOKEN`, `GEMINI_API_KEY`, (선택) `DOWNLOAD_URL`, AdMob vars
+- Health: `GET /health`
 
 이미 Pages로 만들어 둔 프로젝트가 있으면 지우고 **Worker**로 다시 만들거나,  
 기존 Worker 프로젝트의 Root/Deploy 커맨드만 위처럼 고칩니다.

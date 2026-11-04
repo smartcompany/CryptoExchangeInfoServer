@@ -1,0 +1,10 @@
+# Railway: root directory = server
+# Start command defaults to `npm start` → railway-server.js
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

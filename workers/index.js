@@ -35,6 +35,9 @@ export default {
       if (path === '/api/event-analyze' || path === '/event-analyze') {
         return handleEventAnalyze(request, env);
       }
+      if (path === '/privacy') {
+        return privacyHtml();
+      }
       if (path === '/' || path === '/health') {
         return json({ ok: true, runtime: 'cloudflare-workers' });
       }
@@ -57,6 +60,23 @@ function json(body, status = 200, extraHeaders = {}) {
       ...CORS,
       ...extraHeaders,
     },
+  });
+}
+
+function privacyHtml() {
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Privacy Policy - Exora</title>
+<style>body{max-width:720px;margin:0 auto;padding:32px 20px 64px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;line-height:1.65;color:#1a1a1a}h1{font-size:1.75rem}a{color:#1a4d6d}</style>
+</head><body>
+<h1>Privacy Policy</h1>
+<p>Exora (Exora - Crypto Exchange Hub). Full policy:
+<a href="https://cryptoexchangeinfoserver.vercel.app/privacy">cryptoexchangeinfoserver.vercel.app/privacy</a></p>
+<p>Contact: <a href="mailto:gunnylove@gmail.com">gunnylove@gmail.com</a></p>
+</body></html>`;
+  return new Response(html, {
+    status: 200,
+    headers: { 'content-type': 'text/html; charset=utf-8', ...CORS },
   });
 }
 
