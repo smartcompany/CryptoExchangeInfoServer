@@ -20,7 +20,23 @@
 | `GET` | `/api/settings` | AdMob·다운로드 URL·거래소 레퍼럴 |
 | `POST` | `/api/event-analyze` | Gemini 이벤트 분석 (`Bearer` 필요) |
 | `GET` | `/privacy` | 개인정보 처리방침 (스토어 URL) |
-| `GET` | `/health` | Workers 헬스체크 |
+| `GET` | `/health` | Workers / Railway 헬스체크 |
+| `GET` | `/api/cex-probe` | Binance·Bybit·OKX 서버측 접근 스모크 (`Bearer` 필요) |
+
+### CEX 프로브 (푸시 폴링 전 확인)
+
+Railway(또는 로컬)에서 거래소 공개 API가 열리는지 확인:
+
+```bash
+curl -sS "https://cryptoexchangeinfoserver-production.up.railway.app/api/cex-probe?exchange=all" \
+  -H "Authorization: Bearer $EXORA_API_TOKEN" | jq .
+
+# 단일 거래소
+curl -sS ".../api/cex-probe?exchange=binance" -H "Authorization: Bearer $EXORA_API_TOKEN"
+curl -sS ".../api/cex-probe?exchange=bybit" -H "Authorization: Bearer $EXORA_API_TOKEN"
+```
+
+응답의 `results.*.ok` 가 `true`이면 해당 호스트에서 폴링 가능.
 
 ## 환경 변수 / Secrets
 

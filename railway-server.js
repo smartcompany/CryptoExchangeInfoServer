@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import settingsHandler from './api/settings.js';
 import eventAnalyzeHandler from './api/event-analyze.js';
+import cexProbeHandler from './api/cex-probe.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -111,6 +112,11 @@ const server = http.createServer(async (req, rawRes) => {
         adapterReq.body = await readBody(req);
       }
       await eventAnalyzeHandler(adapterReq, res);
+      return;
+    }
+
+    if (pathname === '/api/cex-probe' || pathname === '/cex-probe') {
+      await cexProbeHandler(adapterReq, res);
       return;
     }
 
