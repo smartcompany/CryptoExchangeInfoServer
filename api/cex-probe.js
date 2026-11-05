@@ -24,10 +24,16 @@ export default async function handler(req, res) {
   const exchange = url.searchParams.get('exchange') || 'all';
 
   try {
-    const { allOk, results } = await runCexProbe(exchange);
+    const { allOk, results, egress } = await runCexProbe(exchange);
     return res.status(200).json({
       ok: allOk,
       runtime: process.env.RAILWAY_ENVIRONMENT ? 'railway' : 'node',
+      railway: {
+        environment: process.env.RAILWAY_ENVIRONMENT || null,
+        region: process.env.RAILWAY_REGION || null,
+        serviceName: process.env.RAILWAY_SERVICE_NAME || null,
+      },
+      egress,
       probedAt: new Date().toISOString(),
       exchange,
       results,
