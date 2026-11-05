@@ -11,7 +11,9 @@
     "cf:deploy": "wrangler deploy",
     "deploy:cf": "wrangler deploy"
   },
-  "dependencies": {},
+  "dependencies": {
+    "google-auth-library": "^10.1.0"
+  },
   "devDependencies": {
     "wrangler": "^4.157.0"
   },

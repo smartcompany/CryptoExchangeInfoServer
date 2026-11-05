@@ -13,9 +13,14 @@ import { fileURLToPath } from 'node:url';
 import settingsHandler from './api/settings.js';
 import eventAnalyzeHandler from './api/event-analyze.js';
 import cexProbeHandler from './api/cex-probe.js';
+import { createPushPoller } from './poller/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
+const pushPoller = createPushPoller();
+const PUSH_POLL_DISABLED =
+  String(process.env.PUSH_POLL_DISABLED || '').toLowerCase() === '1' ||
+  String(process.env.PUSH_POLL_DISABLED || '').toLowerCase() === 'true';
 
 function createRes(rawRes) {
   let statusCode = 200;
@@ -87,7 +92,21 @@ const server = http.createServer(async (req, rawRes) => {
 
   try {
     if (pathname === '/' || pathname === '/health') {
-      res.status(200).json({ ok: true, runtime: 'railway' });
+      res.status(200).json({
+        ok: true,
+        runtime: 'railway',
+        pushPoller: pushPoller.status(),
+      });
+      return;
+    }
+
+    if (pathname === '/api/push-poller' || pathname === '/push-poller') {
+      if (req.method === 'POST') {
+        const result = await pushPoller.tick();
+        res.status(200).json(result);
+        return;
+      }
+      res.status(200).json(pushPoller.status());
       return;
     }
     if (pathname === '/privacy') {
@@ -133,4 +152,9 @@ const server = http.createServer(async (req, rawRes) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[exora] Railway HTTP listening on :${PORT}`);
+  if (!PUSH_POLL_DISABLED) {
+    pushPoller.start();
+  } else {
+    console.log('[push-poller] disabled via PUSH_POLL_DISABLED');
+  }
 });

@@ -7,3 +7,5 @@ node_modules/
 .DS_Store
 .vercel
 .dev.vars
+data/push-seen.json
+data/push-seen.json.tmp
