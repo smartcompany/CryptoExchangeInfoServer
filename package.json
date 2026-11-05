@@ -12,6 +12,7 @@
     "deploy:cf": "wrangler deploy"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
     "google-auth-library": "^10.1.0"
   },
   "devDependencies": {

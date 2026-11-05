@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import settingsHandler from './api/settings.js';
 import eventAnalyzeHandler from './api/event-analyze.js';
 import cexProbeHandler from './api/cex-probe.js';
+import pushRegisterHandler from './api/push-register.js';
 import { createPushPoller } from './poller/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -149,6 +150,14 @@ const server = http.createServer(async (req, rawRes) => {
 
     if (pathname === '/api/cex-probe' || pathname === '/cex-probe') {
       await cexProbeHandler(adapterReq, res);
+      return;
+    }
+
+    if (pathname === '/api/push-register' || pathname === '/push-register') {
+      if (req.method === 'POST' || req.method === 'PUT') {
+        adapterReq.body = await readBody(req);
+      }
+      await pushRegisterHandler(adapterReq, res);
       return;
     }
 
