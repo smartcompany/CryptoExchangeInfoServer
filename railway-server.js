@@ -73,17 +73,25 @@ function normalizePath(urlPath) {
   return p;
 }
 
-function sendPrivacy(res) {
-  const file = path.join(__dirname, 'public', 'privacy', 'index.html');
+function sendHtmlFile(rawRes, relativePath) {
+  const file = path.join(__dirname, 'public', relativePath);
   if (!fs.existsSync(file)) {
-    res.statusCode = 404;
-    res.setHeader('content-type', 'text/plain; charset=utf-8');
-    res.end('Not found');
+    rawRes.statusCode = 404;
+    rawRes.setHeader('content-type', 'text/plain; charset=utf-8');
+    rawRes.end('Not found');
     return;
   }
-  res.statusCode = 200;
-  res.setHeader('content-type', 'text/html; charset=utf-8');
-  res.end(fs.readFileSync(file));
+  rawRes.statusCode = 200;
+  rawRes.setHeader('content-type', 'text/html; charset=utf-8');
+  rawRes.end(fs.readFileSync(file));
+}
+
+function sendPrivacy(res) {
+  sendHtmlFile(res, path.join('privacy', 'index.html'));
+}
+
+function sendDashboard(res) {
+  sendHtmlFile(res, path.join('dashboard', 'index.html'));
 }
 
 const server = http.createServer(async (req, rawRes) => {
@@ -111,6 +119,11 @@ const server = http.createServer(async (req, rawRes) => {
     }
     if (pathname === '/privacy') {
       sendPrivacy(rawRes);
+      return;
+    }
+
+    if (pathname === '/dashboard') {
+      sendDashboard(rawRes);
       return;
     }
 

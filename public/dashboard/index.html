@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Exora · Push dashboard</title>
+    <style>
+      :root {
+        --bg: #0f1419;
+        --panel: #1a222c;
+        --line: #2a3542;
+        --ink: #e8eef4;
+        --muted: #8b9aab;
+        --accent: #3dd68c;
+        --danger: #ff6b6b;
+        --warn: #f0c14a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          monospace;
+        background: var(--bg);
+        color: var(--ink);
+        line-height: 1.45;
+        min-height: 100vh;
+      }
+      main {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 28px 20px 48px;
+      }
+      h1 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin: 0 0 4px;
+        letter-spacing: 0.02em;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.8rem;
+        margin-bottom: 22px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+      button {
+        appearance: none;
+        border: 1px solid var(--accent);
+        background: color-mix(in srgb, var(--accent) 18%, transparent);
+        color: var(--ink);
+        font: inherit;
+        font-size: 0.85rem;
+        padding: 10px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--accent) 32%, transparent);
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      button.secondary {
+        border-color: var(--line);
+        background: var(--panel);
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px 10px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--muted);
+      }
+      .dot.ok {
+        background: var(--accent);
+      }
+      .dot.bad {
+        background: var(--danger);
+      }
+      .dot.warn {
+        background: var(--warn);
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+      }
+      section h2 {
+        margin: 0 0 10px;
+        font-size: 0.75rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 0.78rem;
+        color: var(--ink);
+      }
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .meta div {
+        background: var(--bg);
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+      .meta .k {
+        color: var(--muted);
+        font-size: 0.68rem;
+      }
+      .meta .v {
+        font-size: 0.9rem;
+        margin-top: 2px;
+      }
+      .err {
+        color: var(--danger);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Exora push dashboard</h1>
+      <p class="sub">상태 확인 · 폴링 수동 실행</p>
+
+      <div class="row">
+        <button id="runBtn" type="button">Run push poll now</button>
+        <button id="refreshBtn" class="secondary" type="button">Refresh status</button>
+        <span class="pill">
+          <span id="statusDot" class="dot"></span>
+          <span id="statusLabel">idle</span>
+        </span>
+      </div>
+
+      <section>
+        <h2>Poller status</h2>
+        <div class="meta" id="meta"></div>
+      </section>
+
+      <section>
+        <h2>Last result</h2>
+        <pre id="result">—</pre>
+      </section>
+    </main>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const runBtn = $('runBtn');
+      const refreshBtn = $('refreshBtn');
+      const resultEl = $('result');
+      const metaEl = $('meta');
+      const statusDot = $('statusDot');
+      const statusLabel = $('statusLabel');
+
+      function setBusy(busy, label) {
+        runBtn.disabled = busy;
+        refreshBtn.disabled = busy;
+        statusLabel.textContent = label;
+        statusDot.className = 'dot' + (busy ? ' warn' : '');
+      }
+
+      function fmt(v) {
+        if (v === null || v === undefined) return '—';
+        if (typeof v === 'boolean') return v ? 'yes' : 'no';
+        return String(v);
+      }
+
+      function renderStatus(data) {
+        const s = data.pushPoller || data;
+        const cells = [
+          ['seen', s.seenCount],
+          ['ticks', s.tickCount],
+          ['interval', s.intervalMs != null ? `${s.intervalMs}ms` : null],
+          ['dryRun', s.dryRun],
+          ['credentials', s.hasCredentials],
+          ['db', s.dbPath],
+        ];
+        metaEl.innerHTML = cells
+          .map(
+            ([k, v]) =>
+              `<div><div class="k">${k}</div><div class="v">${fmt(v)}</div></div>`,
+          )
+          .join('');
+
+        const last = s.lastResult;
+        if (last) {
+          resultEl.textContent = JSON.stringify(last, null, 2);
+          statusDot.className =
+            'dot ' + (last.ok === false ? 'bad' : 'ok');
+          statusLabel.textContent = last.coldStart
+            ? 'last: cold start'
+            : `last: new=${last.newCount ?? 0} sent=${last.sent ?? 0}`;
+        } else {
+          resultEl.textContent = '— (no tick yet)';
+          statusDot.className = 'dot';
+          statusLabel.textContent = 'no tick yet';
+        }
+      }
+
+      async function loadStatus() {
+        setBusy(true, 'loading…');
+        try {
+          const res = await fetch('/api/push-poller', { cache: 'no-store' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || res.statusText);
+          renderStatus(data);
+        } catch (err) {
+          statusDot.className = 'dot bad';
+          statusLabel.textContent = 'error';
+          resultEl.innerHTML = `<span class="err">${String(err.message || err)}</span>`;
+        } finally {
+          runBtn.disabled = false;
+          refreshBtn.disabled = false;
+        }
+      }
+
+      async function runPoll() {
+        setBusy(true, 'polling…');
+        resultEl.textContent = 'Running tick…';
+        try {
+          const res = await fetch('/api/push-poller', {
+            method: 'POST',
+            cache: 'no-store',
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || res.statusText);
+          resultEl.textContent = JSON.stringify(data, null, 2);
+          statusDot.className =
+            'dot ' + (data.ok === false ? 'bad' : 'ok');
+          statusLabel.textContent = data.coldStart
+            ? 'cold start (no push)'
+            : `done · new=${data.newCount ?? 0} sent=${data.sent ?? 0} failed=${data.failed ?? 0}`;
+          // Refresh summary fields (seenCount etc.)
+          const st = await fetch('/api/push-poller', { cache: 'no-store' });
+          renderStatus(await st.json());
+        } catch (err) {
+          statusDot.className = 'dot bad';
+          statusLabel.textContent = 'error';
+          resultEl.innerHTML = `<span class="err">${String(err.message || err)}</span>`;
+        } finally {
+          runBtn.disabled = false;
+          refreshBtn.disabled = false;
+        }
+      }
+
+      runBtn.addEventListener('click', runPoll);
+      refreshBtn.addEventListener('click', loadStatus);
+      loadStatus();
+    </script>
+  </body>
+</html>
