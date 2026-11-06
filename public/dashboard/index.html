@@ -14,6 +14,7 @@
         --accent: #3dd68c;
         --danger: #ff6b6b;
         --warn: #f0c14a;
+        --info: #6cb6ff;
       }
       * {
         box-sizing: border-box;
@@ -28,7 +29,7 @@
         min-height: 100vh;
       }
       main {
-        max-width: 880px;
+        max-width: 960px;
         margin: 0 auto;
         padding: 28px 20px 48px;
       }
@@ -110,6 +111,10 @@
         color: var(--muted);
         text-transform: uppercase;
         letter-spacing: 0.06em;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
       }
       pre {
         margin: 0;
@@ -140,16 +145,75 @@
       .err {
         color: var(--danger);
       }
+      .explain {
+        background: var(--bg);
+        border-left: 3px solid var(--warn);
+        padding: 10px 12px;
+        font-size: 0.8rem;
+        color: var(--ink);
+        margin-bottom: 10px;
+        border-radius: 0 8px 8px 0;
+      }
+      .log-view {
+        max-height: 420px;
+        overflow: auto;
+        background: var(--bg);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 0.72rem;
+      }
+      .log-line {
+        display: grid;
+        grid-template-columns: 72px 48px 1fr;
+        gap: 8px;
+        padding: 4px 0;
+        border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+      }
+      .log-line:last-child {
+        border-bottom: none;
+      }
+      .log-at {
+        color: var(--muted);
+      }
+      .log-lvl {
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.65rem;
+        letter-spacing: 0.04em;
+      }
+      .log-lvl.info {
+        color: var(--info);
+      }
+      .log-lvl.warn {
+        color: var(--warn);
+      }
+      .log-lvl.error {
+        color: var(--danger);
+      }
+      .log-msg {
+        color: var(--ink);
+      }
+      .log-extra {
+        margin-top: 4px;
+        color: var(--muted);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 0.72rem;
+        margin-top: 8px;
+      }
     </style>
   </head>
   <body>
     <main>
       <h1>Exora push dashboard</h1>
-      <p class="sub">상태 확인 · 폴링 수동 실행</p>
+      <p class="sub">상태 · 수동 폴링 · 상세 로그</p>
 
       <div class="row">
         <button id="runBtn" type="button">Run push poll now</button>
-        <button id="refreshBtn" class="secondary" type="button">Refresh status</button>
+        <button id="refreshBtn" class="secondary" type="button">Refresh</button>
         <span class="pill">
           <span id="statusDot" class="dot"></span>
           <span id="statusLabel">idle</span>
@@ -162,7 +226,25 @@
       </section>
 
       <section>
-        <h2>Last result</h2>
+        <h2>Why no push?</h2>
+        <div id="explain" class="explain">—</div>
+      </section>
+
+      <section>
+        <h2>
+          <span>Process log</span>
+          <span id="logCount" style="font-weight: 400; text-transform: none; letter-spacing: 0"></span>
+        </h2>
+        <div id="logView" class="log-view">
+          <div class="hint">No log yet.</div>
+        </div>
+        <p class="hint">
+          Tip: <code>newCount=0</code> means everything is already in the seen DB — FCM will not fire until a truly new announcement appears.
+        </p>
+      </section>
+
+      <section>
+        <h2>Last result (JSON)</h2>
         <pre id="result">—</pre>
       </section>
     </main>
@@ -174,6 +256,9 @@
       const metaEl = $('meta');
       const statusDot = $('statusDot');
       const statusLabel = $('statusLabel');
+      const logView = $('logView');
+      const logCount = $('logCount');
+      const explainEl = $('explain');
 
       function setBusy(busy, label) {
         runBtn.disabled = busy;
@@ -188,8 +273,65 @@
         return String(v);
       }
 
-      function renderStatus(data) {
+      function esc(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      function timeOnly(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return String(iso).slice(11, 19) || iso;
+        return d.toISOString().slice(11, 19);
+      }
+
+      function renderLog(entries) {
+        const list = Array.isArray(entries) ? entries : [];
+        logCount.textContent = list.length ? `${list.length} lines` : '';
+        if (!list.length) {
+          logView.innerHTML = '<div class="hint">No log yet.</div>';
+          return;
+        }
+        logView.innerHTML = list
+          .map((e) => {
+            const lvl = e.level || 'info';
+            const extra =
+              e.extra === undefined
+                ? ''
+                : `<div class="log-extra">${esc(
+                    typeof e.extra === 'string'
+                      ? e.extra
+                      : JSON.stringify(e.extra, null, 2),
+                  )}</div>`;
+            return `<div class="log-line">
+              <div class="log-at">${esc(timeOnly(e.at))}</div>
+              <div class="log-lvl ${esc(lvl)}">${esc(lvl)}</div>
+              <div class="log-msg">${esc(e.message || '')}${extra}</div>
+            </div>`;
+          })
+          .join('');
+        logView.scrollTop = logView.scrollHeight;
+      }
+
+      function explainFrom(last) {
+        if (!last) return 'No tick yet.';
+        if (last.explanation) return last.explanation;
+        if (last.coldStart) {
+          return 'Cold start: seeded seen DB only — no FCM on first empty-DB poll.';
+        }
+        if (last.ok === false) return last.error || 'Tick failed.';
+        if ((last.newCount ?? 0) === 0) {
+          return 'No new announcements vs seen DB → nothing to send.';
+        }
+        if ((last.sent ?? 0) > 0) return `Sent ${last.sent} push(es).`;
+        return 'See process log for details.';
+      }
+
+      function renderStatus(data, preferResult) {
         const s = data.pushPoller || data;
+        const last = preferResult || s.lastResult;
         const cells = [
           ['seen', s.seenCount],
           ['ticks', s.tickCount],
@@ -205,9 +347,14 @@
           )
           .join('');
 
-        const last = s.lastResult;
+        explainEl.textContent = explainFrom(last);
+
+        const logEntries = preferResult?.log || s.log || last?.log || [];
+        renderLog(logEntries);
+
         if (last) {
-          resultEl.textContent = JSON.stringify(last, null, 2);
+          const { log: _omit, ...rest } = last;
+          resultEl.textContent = JSON.stringify(rest, null, 2);
           statusDot.className =
             'dot ' + (last.ok === false ? 'bad' : 'ok');
           statusLabel.textContent = last.coldStart
@@ -230,7 +377,8 @@
         } catch (err) {
           statusDot.className = 'dot bad';
           statusLabel.textContent = 'error';
-          resultEl.innerHTML = `<span class="err">${String(err.message || err)}</span>`;
+          explainEl.innerHTML = `<span class="err">${esc(err.message || err)}</span>`;
+          resultEl.innerHTML = `<span class="err">${esc(err.message || err)}</span>`;
         } finally {
           runBtn.disabled = false;
           refreshBtn.disabled = false;
@@ -239,6 +387,7 @@
 
       async function runPoll() {
         setBusy(true, 'polling…');
+        explainEl.textContent = 'Running tick…';
         resultEl.textContent = 'Running tick…';
         try {
           const res = await fetch('/api/push-poller', {
@@ -247,19 +396,23 @@
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || res.statusText);
-          resultEl.textContent = JSON.stringify(data, null, 2);
-          statusDot.className =
-            'dot ' + (data.ok === false ? 'bad' : 'ok');
-          statusLabel.textContent = data.coldStart
-            ? 'cold start (no push)'
-            : `done · new=${data.newCount ?? 0} sent=${data.sent ?? 0} failed=${data.failed ?? 0}`;
-          // Refresh summary fields (seenCount etc.)
+
           const st = await fetch('/api/push-poller', { cache: 'no-store' });
-          renderStatus(await st.json());
+          const status = await st.json();
+          // Prefer POST body (includes this tick's log) + fresh meta counts.
+          renderStatus(
+            {
+              ...status,
+              log: data.log || status.log,
+              lastResult: data,
+            },
+            data,
+          );
         } catch (err) {
           statusDot.className = 'dot bad';
           statusLabel.textContent = 'error';
-          resultEl.innerHTML = `<span class="err">${String(err.message || err)}</span>`;
+          explainEl.innerHTML = `<span class="err">${esc(err.message || err)}</span>`;
+          resultEl.innerHTML = `<span class="err">${esc(err.message || err)}</span>`;
         } finally {
           runBtn.disabled = false;
           refreshBtn.disabled = false;
