@@ -1,7 +1,7 @@
 /**
  * Full announcement pulls for the push poller (same public APIs as cex-fetch probes).
  */
-import { createHash } from 'node:crypto';
+import { seenKey, titleHash } from './fingerprint.js';
 
 const BROWSER_HEADERS = {
   'User-Agent':
@@ -19,8 +19,17 @@ async function getJson(url, headers = {}) {
   return res.json();
 }
 
-function hashKey(s) {
-  return createHash('sha1').update(String(s)).digest('hex').slice(0, 12);
+function withSeenFields(exchange, title, publishedAt, rest) {
+  const th = titleHash(title);
+  const d = String(publishedAt ?? '');
+  return {
+    id: seenKey(th, d),
+    titleHash: th,
+    publishedAt: d,
+    exchange,
+    title,
+    ...rest,
+  };
 }
 
 export async function fetchBinanceAnnouncements(limit = 20) {
@@ -47,15 +56,15 @@ export async function fetchBinanceAnnouncements(limit = 20) {
   return articles.map((raw) => {
     const code = String(raw.code ?? '').trim();
     const title = String(raw.title ?? '').trim();
-    return {
-      id: `binance:${code || hashKey(title)}`,
-      exchange: 'binance',
-      title,
+    const publishedAt = String(
+      raw.releaseDate ?? raw.publishDate ?? raw.firstReleaseDate ?? '',
+    );
+    return withSeenFields('binance', title, publishedAt, {
       url: code
         ? `https://www.binance.com/en/support/announcement/detail/${code}`
         : 'https://www.binance.com/en/support/announcement',
       tags: ['Latest Activities'],
-    };
+    });
   });
 }
 
@@ -71,14 +80,11 @@ export async function fetchBybitAnnouncements(limit = 20) {
   return list.map((raw) => {
     const u = String(raw.url ?? '').trim();
     const title = String(raw.title ?? '').trim();
-    const tags = (raw.tags ?? []).map(String);
-    return {
-      id: `bybit:${hashKey(u || `${title}:${raw.publishTime ?? ''}`)}`,
-      exchange: 'bybit',
-      title,
+    const publishedAt = String(raw.publishTime ?? '');
+    return withSeenFields('bybit', title, publishedAt, {
       url: u,
-      tags,
-    };
+      tags: (raw.tags ?? []).map(String),
+    });
   });
 }
 
@@ -108,13 +114,13 @@ export async function fetchOkxAnnouncements(limit = 20) {
   return details.map((raw) => {
     const u = String(raw.url ?? '').trim();
     const title = String(raw.title ?? '').trim();
-    return {
-      id: `okx:${hashKey(u || title)}`,
-      exchange: 'okx',
-      title,
+    const publishedAt = String(
+      raw.pTime ?? raw.cTime ?? raw.publishTime ?? raw.ts ?? '',
+    );
+    return withSeenFields('okx', title, publishedAt, {
       url: u || 'https://www.okx.com/help',
       tags: [String(raw.annType ?? annType)],
-    };
+    });
   });
 }
 
