@@ -22,10 +22,29 @@ export const CAT_LABEL = {
   other: 'Campaign',
 };
 
+/** Single-item condition (legacy). Prefer [fcmDigestCondition]. */
 export function fcmCondition(category, exchange) {
   const catTopic = CAT[category] || CAT.other;
   const exTopic = EX[exchange];
   if (!exTopic) return null;
-  // FCM topic condition: both category and exchange must be subscribed.
   return `'${catTopic}' in topics && '${exTopic}' in topics`;
+}
+
+/**
+ * Digest targeting: OR of exchange topics present in the batch.
+ * FCM allows ≤5 topics in a condition; we poll ≤3 exchanges.
+ * Client filters by category prefs before showing.
+ */
+export function fcmDigestCondition(exchanges) {
+  const topics = [];
+  const seen = new Set();
+  for (const ex of exchanges) {
+    const t = EX[ex];
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
+    topics.push(t);
+  }
+  if (topics.length === 0) return null;
+  if (topics.length === 1) return `'${topics[0]}' in topics`;
+  return topics.map((t) => `'${t}' in topics`).join(' || ');
 }

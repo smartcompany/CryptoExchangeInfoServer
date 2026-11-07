@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifyAnnouncement } from './classify.js';
 import { fetchAllAnnouncements } from './fetch-announcements.js';
-import { sendOpportunityPush } from './fcm-send.js';
+import { sendOpportunityDigest } from './fcm-send.js';
 import { createLogBuffer } from './log-buffer.js';
 import { countSeen, filterAndMarkNew, openSeenDb, seedSeen } from './seen.js';
 
@@ -167,62 +167,50 @@ export function createPushPoller(options = {}) {
         );
       }
 
-      if (!dryRun) {
-        for (const event of fresh) {
+      if (fresh.length > 0) {
+        if (!dryRun) {
           try {
-            const result = await sendOpportunityPush(event);
+            const result = await sendOpportunityDigest(fresh);
             pushed.push({
-              id: event.id,
-              exchange: event.exchange,
-              category: event.category,
-              title: String(event.title || '').slice(0, 80),
+              type: 'opportunity_digest',
+              count: fresh.length,
+              exchanges: [...new Set(fresh.map((e) => e.exchange))],
+              categories: [...new Set(fresh.map((e) => e.category))],
               result,
             });
             if (result.ok) {
-              log.info(
-                `sent ${event.exchange}/${event.category}`,
-                {
-                  id: event.id,
-                  name: result.name,
-                  condition: result.condition,
-                  title: String(event.title || '').slice(0, 72),
-                },
-              );
+              log.info(`sent digest (${fresh.length} item(s))`, {
+                name: result.name,
+                condition: result.condition,
+                exchanges: result.exchanges,
+                categories: result.categories,
+              });
             } else if (result.skipped) {
-              log.warn(
-                `skip ${event.exchange}/${event.category} reason=${result.reason}`,
-                { id: event.id },
-              );
+              log.warn(`skip digest reason=${result.reason}`);
             } else {
-              log.error(`fail ${event.exchange}/${event.category}`, {
-                id: event.id,
+              log.error('fail digest', {
                 error: result.error || result,
               });
             }
           } catch (err) {
             const error = String(err?.message ?? err);
             pushed.push({
-              id: event.id,
-              exchange: event.exchange,
-              category: event.category,
-              title: String(event.title || '').slice(0, 80),
+              type: 'opportunity_digest',
+              count: fresh.length,
               result: { ok: false, error },
             });
-            log.error(`fail ${event.exchange}/${event.category}`, {
-              id: event.id,
-              error,
-            });
+            log.error('fail digest', { error });
           }
-        }
-      } else {
-        pushed = fresh.map((e) => ({
-          id: e.id,
-          exchange: e.exchange,
-          category: e.category,
-          title: String(e.title || '').slice(0, 80),
-          result: { skipped: true, reason: 'dry_run' },
-        }));
-        if (fresh.length) {
+        } else {
+          pushed = [
+            {
+              type: 'opportunity_digest',
+              count: fresh.length,
+              exchanges: [...new Set(fresh.map((e) => e.exchange))],
+              categories: [...new Set(fresh.map((e) => e.category))],
+              result: { skipped: true, reason: 'dry_run' },
+            },
+          ];
           log.warn(`tick #${tickId} dryRun=true — not calling FCM`);
         }
       }
@@ -235,9 +223,10 @@ export function createPushPoller(options = {}) {
       } else if (summary.sent === 0 && summary.skipped > 0) {
         explanation = `New items found but FCM skipped (${JSON.stringify(summary.skipReasons)}). Check FIREBASE_SERVICE_ACCOUNT_JSON / dryRun.`;
       } else if (summary.sent === 0 && summary.failed > 0) {
-        explanation = 'New items found but FCM send failed — see log lines / pushed[].result.error.';
+        explanation = 'New items found but FCM digest send failed — see log lines / pushed[].result.error.';
       } else if (summary.sent > 0) {
-        explanation = `Sent ${summary.sent} FCM message(s) via topic condition. Devices must be subscribed to matching category+exchange topics.`;
+        explanation =
+          'Sent 1 data-only digest via exchange-topic OR condition. Client localizes and filters by category prefs.';
       }
 
       lastResult = {

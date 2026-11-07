@@ -1,5 +1,5 @@
 import { GoogleAuth } from 'google-auth-library';
-import { CAT_LABEL, fcmCondition } from './topics.js';
+import { fcmDigestCondition } from './topics.js';
 
 const SCOPES = ['https://www.googleapis.com/auth/firebase.messaging'];
 
@@ -28,27 +28,45 @@ async function getAccessToken(sa) {
   return token.token;
 }
 
+function uniquePreserve(values) {
+  const out = [];
+  const seen = new Set();
+  for (const v of values) {
+    const key = String(v || '');
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
 /**
- * Send one opportunity push via FCM topic condition.
- * No-op (returns { skipped: true }) when credentials missing.
+ * One data-only digest per poll tick.
+ * Client localizes + shows a local notification; filters by local prefs.
  */
-export async function sendOpportunityPush(event) {
+export async function sendOpportunityDigest(events) {
   const sa = loadServiceAccount();
   if (!sa?.project_id) {
     return { skipped: true, reason: 'no_credentials' };
   }
 
-  const condition = fcmCondition(event.category, event.exchange);
+  const list = Array.isArray(events) ? events.filter(Boolean) : [];
+  if (list.length === 0) {
+    return { skipped: true, reason: 'empty' };
+  }
+
+  const exchanges = uniquePreserve(list.map((e) => e.exchange));
+  const categories = uniquePreserve(list.map((e) => e.category || 'other'));
+  const condition = fcmDigestCondition(exchanges);
   if (!condition) {
     return { skipped: true, reason: 'unknown_exchange' };
   }
 
-  const exchangeLabel =
-    String(event.exchange || '').charAt(0).toUpperCase() +
-    String(event.exchange || '').slice(1);
-  const catLabel = CAT_LABEL[event.category] || CAT_LABEL.other;
-  const title = `${exchangeLabel} · ${catLabel}`;
-  const body = String(event.title || '').slice(0, 120);
+  // pairs: "binance:contest,okx:listing" — client filters by prefs.
+  const pairs = uniquePreserve(
+    list.map((e) => `${e.exchange}:${e.category || 'other'}`),
+  );
+  const firstUrl = String(list.find((e) => e.url)?.url || '');
 
   const accessToken = await getAccessToken(sa);
   const endpoint = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
@@ -56,19 +74,27 @@ export async function sendOpportunityPush(event) {
   const message = {
     message: {
       condition,
-      notification: { title, body },
+      // Data-only: OS must not show a pre-localized banner.
       data: {
-        url: String(event.url || ''),
-        exchange: String(event.exchange || ''),
-        category: String(event.category || 'other'),
-        eventId: String(event.id || ''),
+        type: 'opportunity_digest',
+        exchanges: exchanges.join(','),
+        categories: categories.join(','),
+        pairs: pairs.join(','),
+        count: String(list.length),
+        url: firstUrl,
       },
       android: {
         priority: 'high',
       },
       apns: {
+        headers: {
+          'apns-priority': '10',
+          'apns-push-type': 'background',
+        },
         payload: {
-          aps: { sound: 'default' },
+          aps: {
+            'content-available': 1,
+          },
         },
       },
     },
@@ -100,5 +126,12 @@ export async function sendOpportunityPush(event) {
       condition,
     };
   }
-  return { ok: true, name: parsed.name, condition };
+  return {
+    ok: true,
+    name: parsed.name,
+    condition,
+    exchanges,
+    categories,
+    count: list.length,
+  };
 }
