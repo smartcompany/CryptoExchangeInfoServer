@@ -5,18 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "npx --yes vercel@latest dev",
-    "start": "node railway-server.js",
-    "railway": "node railway-server.js",
-    "cf:dev": "wrangler dev",
-    "cf:deploy": "wrangler deploy",
-    "deploy:cf": "wrangler deploy"
+    "start": "node standalone-server.js",
+    "standalone": "node standalone-server.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "google-auth-library": "^10.1.0"
-  },
-  "devDependencies": {
-    "wrangler": "^4.157.0"
   },
   "engines": {
     "node": ">=20"

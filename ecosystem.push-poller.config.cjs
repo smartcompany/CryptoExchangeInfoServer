@@ -1,5 +1,5 @@
 /**
- * PM2 app definition for the Exora push poller (railway-server.js).
+ * PM2 app definition for the Exora push poller (standalone-server.js).
  *
  * Usage:
  *   ./pm2-push-poller.sh
@@ -40,7 +40,7 @@ module.exports = {
   apps: [
     {
       name: 'exora-push-poller',
-      script: path.join(root, 'railway-server.js'),
+      script: path.join(root, 'standalone-server.js'),
       cwd: root,
       interpreter: 'node',
       instances: 1,

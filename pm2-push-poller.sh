@@ -15,8 +15,8 @@ if ! command -v pm2 >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ ! -f "$ROOT/railway-server.js" ]]; then
-  echo "railway-server.js missing in $ROOT" >&2
+if [[ ! -f "$ROOT/standalone-server.js" ]]; then
+  echo "standalone-server.js missing in $ROOT" >&2
   exit 1
 fi
 
@@ -25,10 +25,8 @@ if [[ ! -f "$ROOT/.env" ]]; then
 fi
 
 if [[ ! -d "$ROOT/node_modules" ]]; then
-  # Poller only needs runtime deps. Skipping wrangler (devDependency) is much
-  # faster on Raspberry Pi / low-power hosts.
-  echo "node_modules missing — running npm install --omit=dev …"
-  npm install --omit=dev --no-fund --no-audit
+  echo "node_modules missing — running npm install …"
+  npm install --no-fund --no-audit
 fi
 
 echo "PM2 startOrReload → $NAME"

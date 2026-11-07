@@ -7,7 +7,7 @@ import { runCexProbe } from '../lib/cex-fetch.js';
  * Auth: Authorization: Bearer <EXORA_API_TOKEN>
  *
  * Hits CEX public announcement APIs from this host so you can see if
- * Railway (or Vercel) is geo-blocked before enabling a push poller.
+ * the host is geo-blocked before enabling a push poller.
  */
 export default async function handler(req, res) {
   applyCors(res);
@@ -27,12 +27,7 @@ export default async function handler(req, res) {
     const { allOk, results, egress } = await runCexProbe(exchange);
     return res.status(200).json({
       ok: allOk,
-      runtime: process.env.RAILWAY_ENVIRONMENT ? 'railway' : 'node',
-      railway: {
-        environment: process.env.RAILWAY_ENVIRONMENT || null,
-        region: process.env.RAILWAY_REGION || null,
-        serviceName: process.env.RAILWAY_SERVICE_NAME || null,
-      },
+      runtime: process.env.VERCEL ? 'vercel' : 'node',
       egress,
       probedAt: new Date().toISOString(),
       exchange,

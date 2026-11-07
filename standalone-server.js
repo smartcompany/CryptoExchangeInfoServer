@@ -1,9 +1,11 @@
 /**
- * Long-running HTTP server for Railway (and similar hosts).
+ * Long-running HTTP server for local / Raspberry Pi (PM2).
  * Reuses Vercel-style handlers in api/*.js with a thin req/res adapter.
+ * Hosts the push poller in-process (Vercel serverless cannot run a cron loop).
  *
- *   PORT=3000 node railway-server.js
+ *   PORT=3010 node standalone-server.js
  *   npm start
+ *   ./pm2-push-poller.sh
  */
 import http from 'node:http';
 import fs from 'node:fs';
@@ -103,7 +105,7 @@ const server = http.createServer(async (req, rawRes) => {
     if (pathname === '/' || pathname === '/health') {
       res.status(200).json({
         ok: true,
-        runtime: 'railway',
+        runtime: 'standalone',
         pushPoller: pushPoller.status(),
       });
       return;
@@ -163,7 +165,7 @@ const server = http.createServer(async (req, rawRes) => {
 
     res.status(404).json({ error: 'Not found' });
   } catch (error) {
-    console.error('[railway-server]', error);
+    console.error('[standalone-server]', error);
     if (!rawRes.headersSent) {
       res.status(500).json({
         error: error instanceof Error ? error.message : String(error),
@@ -173,7 +175,7 @@ const server = http.createServer(async (req, rawRes) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[exora] Railway HTTP listening on :${PORT}`);
+  console.log(`[exora] standalone HTTP listening on :${PORT}`);
   if (!PUSH_POLL_DISABLED) {
     pushPoller.start();
   } else {
