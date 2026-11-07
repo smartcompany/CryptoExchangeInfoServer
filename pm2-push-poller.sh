@@ -25,8 +25,10 @@ if [[ ! -f "$ROOT/.env" ]]; then
 fi
 
 if [[ ! -d "$ROOT/node_modules" ]]; then
-  echo "node_modules missing — running npm install…"
-  npm install
+  # Poller only needs runtime deps. Skipping wrangler (devDependency) is much
+  # faster on Raspberry Pi / low-power hosts.
+  echo "node_modules missing — running npm install --omit=dev …"
+  npm install --omit=dev --no-fund --no-audit
 fi
 
 echo "PM2 startOrReload → $NAME"
