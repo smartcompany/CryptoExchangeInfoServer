@@ -1,5 +1,6 @@
 import { requireAppToken } from '../lib/auth.js';
 import { applyCors, handleOptions } from '../lib/cors.js';
+import { parseGeminiUsage, recordAiUsage } from '../lib/ai-usage.js';
 
 const LANGUAGE_NAMES = {
   en: 'English',
@@ -182,6 +183,13 @@ End (ms): ${payload.endDateTimestamp ?? null}`;
     const rawText = await geminiRes.text();
     if (!geminiRes.ok) {
       console.error('[event-analyze] Gemini HTTP', geminiRes.status, rawText);
+      await recordAiUsage({
+        model: GEMINI_MODEL,
+        exchange,
+        language,
+        ok: false,
+        error: `Gemini HTTP ${geminiRes.status}`,
+      });
       return res.status(500).json({
         error: `Gemini HTTP ${geminiRes.status}`,
         detail: clip(rawText),
@@ -194,15 +202,34 @@ End (ms): ${payload.endDateTimestamp ?? null}`;
       body = JSON.parse(rawText);
     } catch (parseError) {
       console.error('[event-analyze] Invalid Gemini response', rawText);
+      await recordAiUsage({
+        model: GEMINI_MODEL,
+        exchange,
+        language,
+        ok: false,
+        error: 'Invalid Gemini response',
+      });
       return res.status(500).json({
         error: 'Invalid Gemini response',
         detail: clip(rawText),
       });
     }
 
+    const usage = parseGeminiUsage(
+      body.usageMetadata ?? body.usage_metadata ?? null,
+    );
+
     const candidates = body.candidates ?? [];
     if (!candidates.length) {
       console.error('[event-analyze] Empty Gemini candidates', rawText);
+      await recordAiUsage({
+        model: GEMINI_MODEL,
+        exchange,
+        language,
+        ok: false,
+        error: 'Empty Gemini candidates',
+        ...usage,
+      });
       return res.status(500).json({
         error: 'Empty Gemini candidates',
         detail: clip(rawText),
@@ -217,6 +244,14 @@ End (ms): ${payload.endDateTimestamp ?? null}`;
 
     if (!text) {
       console.error('[event-analyze] Empty Gemini text', rawText);
+      await recordAiUsage({
+        model: GEMINI_MODEL,
+        exchange,
+        language,
+        ok: false,
+        error: 'Empty Gemini text',
+        ...usage,
+      });
       return res.status(500).json({
         error: 'Empty Gemini text',
         detail: clip(rawText),
@@ -226,6 +261,14 @@ End (ms): ${payload.endDateTimestamp ?? null}`;
     const analysis = parseJsonObject(text);
     if (!analysis) {
       console.error('[event-analyze] Failed to parse Gemini JSON', text);
+      await recordAiUsage({
+        model: GEMINI_MODEL,
+        exchange,
+        language,
+        ok: false,
+        error: 'Failed to parse Gemini JSON',
+        ...usage,
+      });
       return res.status(500).json({
         error: 'Failed to parse Gemini JSON',
         detail: clip(text),
@@ -245,12 +288,45 @@ End (ms): ${payload.endDateTimestamp ?? null}`;
       );
     }
 
+    const urlMetaList =
+      urlContextMeta?.urlMetadata ?? urlContextMeta?.url_metadata ?? [];
+    const urlContextOk = Array.isArray(urlMetaList)
+      ? urlMetaList.some((m) =>
+          String(
+            m?.urlRetrievalStatus ?? m?.url_retrieval_status ?? '',
+          ).includes('SUCCESS'),
+        )
+      : null;
+
+    await recordAiUsage({
+      model: GEMINI_MODEL,
+      exchange,
+      language,
+      ok: true,
+      urlContextOk,
+      ...usage,
+    });
+
     return res.status(200).json({
       analysis,
+      usage: {
+        promptTokens: usage.promptTokens,
+        candidatesTokens: usage.candidatesTokens,
+        thoughtsTokens: usage.thoughtsTokens,
+        totalTokens: usage.totalTokens,
+        estimatedCostUsd: usage.estimatedCostUsd,
+      },
       ...(urlContextMeta ? { urlContext: urlContextMeta } : {}),
     });
   } catch (error) {
     console.error('[event-analyze]', error);
+    await recordAiUsage({
+      model: GEMINI_MODEL,
+      exchange,
+      language,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return res.status(500).json({
       error: error instanceof Error ? error.message : String(error),
       detail: error instanceof Error ? error.stack ?? error.message : String(error),

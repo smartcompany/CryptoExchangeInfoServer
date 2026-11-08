@@ -16,6 +16,7 @@ import settingsHandler from './api/settings.js';
 import eventAnalyzeHandler from './api/event-analyze.js';
 import cexProbeHandler from './api/cex-probe.js';
 import pushRegisterHandler from './api/push-register.js';
+import aiUsageHandler from './api/ai-usage.js';
 import { createPushPoller } from './poller/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -160,6 +161,27 @@ const server = http.createServer(async (req, rawRes) => {
         adapterReq.body = await readBody(req);
       }
       await pushRegisterHandler(adapterReq, res);
+      return;
+    }
+
+    if (pathname === '/api/ai-usage' || pathname === '/ai-usage') {
+      adapterReq.url = req.url;
+      await aiUsageHandler(adapterReq, res);
+      return;
+    }
+
+    // Same-origin dashboard helper: injects EXORA_API_TOKEN from server env.
+    if (pathname === '/api/dashboard/ai-usage') {
+      const token = process.env.EXORA_API_TOKEN?.trim() ?? '';
+      adapterReq.url = req.url?.replace(
+        '/api/dashboard/ai-usage',
+        '/api/ai-usage',
+      );
+      adapterReq.headers = {
+        ...req.headers,
+        authorization: token ? `Bearer ${token}` : '',
+      };
+      await aiUsageHandler(adapterReq, res);
       return;
     }
 

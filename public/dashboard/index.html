@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Exora · Push dashboard</title>
+    <title>Exora · Dashboard</title>
     <style>
       :root {
         --bg: #0f1419;
@@ -42,7 +42,35 @@
       .sub {
         color: var(--muted);
         font-size: 0.8rem;
-        margin-bottom: 22px;
+        margin-bottom: 16px;
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 18px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 10px;
+      }
+      .tab {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--muted);
+        font: inherit;
+        font-size: 0.85rem;
+        padding: 8px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .tab.active {
+        border-color: var(--accent);
+        color: var(--ink);
+        background: color-mix(in srgb, var(--accent) 18%, transparent);
+      }
+      .panel {
+        display: none;
+      }
+      .panel.active {
+        display: block;
       }
       .row {
         display: flex;
@@ -116,70 +144,53 @@
         justify-content: space-between;
         gap: 8px;
       }
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+      }
+      .meta .k {
+        color: var(--muted);
+        font-size: 0.7rem;
+      }
+      .meta .v {
+        font-size: 0.9rem;
+        word-break: break-all;
+      }
       pre {
         margin: 0;
         white-space: pre-wrap;
         word-break: break-word;
-        font-size: 0.78rem;
+        font-size: 0.75rem;
         color: var(--ink);
+        max-height: 360px;
+        overflow: auto;
       }
-      .meta {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: 8px;
-        margin-bottom: 4px;
-      }
-      .meta div {
-        background: var(--bg);
-        border-radius: 8px;
-        padding: 8px 10px;
-      }
-      .meta .k {
-        color: var(--muted);
-        font-size: 0.68rem;
-      }
-      .meta .v {
-        font-size: 0.9rem;
-        margin-top: 2px;
+      .explain {
+        font-size: 0.85rem;
       }
       .err {
         color: var(--danger);
       }
-      .explain {
-        background: var(--bg);
-        border-left: 3px solid var(--warn);
-        padding: 10px 12px;
-        font-size: 0.8rem;
-        color: var(--ink);
-        margin-bottom: 10px;
-        border-radius: 0 8px 8px 0;
+      .hint {
+        color: var(--muted);
+        font-size: 0.72rem;
+        margin-top: 8px;
       }
       .log-view {
-        max-height: 420px;
+        max-height: 320px;
         overflow: auto;
-        background: var(--bg);
-        border-radius: 8px;
-        padding: 8px 10px;
-        font-size: 0.72rem;
+        font-size: 0.75rem;
       }
       .log-line {
         display: grid;
-        grid-template-columns: 72px 48px 1fr;
+        grid-template-columns: 64px 52px 1fr;
         gap: 8px;
         padding: 4px 0;
-        border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
-      }
-      .log-line:last-child {
-        border-bottom: none;
+        border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
       }
       .log-at {
         color: var(--muted);
-      }
-      .log-lvl {
-        font-weight: 700;
-        text-transform: uppercase;
-        font-size: 0.65rem;
-        letter-spacing: 0.04em;
       }
       .log-lvl.info {
         color: var(--info);
@@ -190,63 +201,133 @@
       .log-lvl.error {
         color: var(--danger);
       }
-      .log-msg {
-        color: var(--ink);
-      }
       .log-extra {
         margin-top: 4px;
         color: var(--muted);
         white-space: pre-wrap;
-        word-break: break-word;
       }
-      .hint {
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
         color: var(--muted);
-        font-size: 0.72rem;
-        margin-top: 8px;
+        font-weight: 600;
+      }
+      select {
+        background: var(--panel);
+        color: var(--ink);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font: inherit;
+        font-size: 0.85rem;
       }
     </style>
   </head>
   <body>
     <main>
-      <h1>Exora push dashboard</h1>
-      <p class="sub">상태 · 수동 폴링 · 상세 로그</p>
+      <h1>Exora dashboard</h1>
+      <p class="sub">Push poller · AI usage / cost</p>
 
-      <div class="row">
-        <button id="runBtn" type="button">Run push poll now</button>
-        <button id="refreshBtn" class="secondary" type="button">Refresh</button>
-        <span class="pill">
-          <span id="statusDot" class="dot"></span>
-          <span id="statusLabel">idle</span>
-        </span>
+      <div class="tabs">
+        <button type="button" class="tab active" data-tab="push">Push</button>
+        <button type="button" class="tab" data-tab="ai">AI usage</button>
       </div>
 
-      <section>
-        <h2>Poller status</h2>
-        <div class="meta" id="meta"></div>
-      </section>
-
-      <section>
-        <h2>Why no push?</h2>
-        <div id="explain" class="explain">—</div>
-      </section>
-
-      <section>
-        <h2>
-          <span>Process log</span>
-          <span id="logCount" style="font-weight: 400; text-transform: none; letter-spacing: 0"></span>
-        </h2>
-        <div id="logView" class="log-view">
-          <div class="hint">No log yet.</div>
+      <div id="panel-push" class="panel active">
+        <div class="row">
+          <button id="runBtn" type="button">Run push poll now</button>
+          <button id="refreshBtn" class="secondary" type="button">Refresh</button>
+          <span class="pill">
+            <span id="statusDot" class="dot"></span>
+            <span id="statusLabel">idle</span>
+          </span>
         </div>
-        <p class="hint">
-          Tip: <code>newCount=0</code> means everything is already in the seen DB — FCM will not fire until a truly new announcement appears.
-        </p>
-      </section>
 
-      <section>
-        <h2>Last result (JSON)</h2>
-        <pre id="result">—</pre>
-      </section>
+        <section>
+          <h2>Poller status</h2>
+          <div class="meta" id="meta"></div>
+        </section>
+
+        <section>
+          <h2>Why no push?</h2>
+          <div id="explain" class="explain">—</div>
+        </section>
+
+        <section>
+          <h2>
+            <span>Process log</span>
+            <span
+              id="logCount"
+              style="font-weight: 400; text-transform: none; letter-spacing: 0"
+            ></span>
+          </h2>
+          <div id="logView" class="log-view">
+            <div class="hint">No log yet.</div>
+          </div>
+          <p class="hint">
+            Tip: <code>newCount=0</code> means everything is already in the seen
+            DB — FCM will not fire until a truly new announcement appears.
+          </p>
+        </section>
+
+        <section>
+          <h2>Last result (JSON)</h2>
+          <pre id="result">—</pre>
+        </section>
+      </div>
+
+      <div id="panel-ai" class="panel">
+        <div class="row">
+          <label>
+            <span class="pill" style="margin-right: 6px">days</span>
+            <select id="aiDays">
+              <option value="7">7</option>
+              <option value="30" selected>30</option>
+              <option value="90">90</option>
+            </select>
+          </label>
+          <button id="aiRefreshBtn" type="button">Refresh AI usage</button>
+          <span class="pill">
+            <span id="aiStatusDot" class="dot"></span>
+            <span id="aiStatusLabel">idle</span>
+          </span>
+        </div>
+
+        <section>
+          <h2>Summary (estimated USD)</h2>
+          <div class="meta" id="aiMeta"></div>
+          <p class="hint" id="aiRatesHint">
+            Cost estimate uses configured Gemini $/1M rates (default
+            gemini-3.5-flash-lite paid: in $0.30 / out $2.50). Override with
+            GEMINI_INPUT_USD_PER_1M / GEMINI_OUTPUT_USD_PER_1M.
+          </p>
+        </section>
+
+        <section>
+          <h2>By day</h2>
+          <div id="aiByDay">—</div>
+        </section>
+
+        <section>
+          <h2>By exchange</h2>
+          <div id="aiByExchange">—</div>
+        </section>
+
+        <section>
+          <h2>Recent calls</h2>
+          <div id="aiRecent">—</div>
+        </section>
+      </div>
     </main>
     <script>
       const $ = (id) => document.getElementById(id);
@@ -259,6 +340,29 @@
       const logView = $('logView');
       const logCount = $('logCount');
       const explainEl = $('explain');
+      const aiRefreshBtn = $('aiRefreshBtn');
+      const aiDays = $('aiDays');
+      const aiMeta = $('aiMeta');
+      const aiByDay = $('aiByDay');
+      const aiByExchange = $('aiByExchange');
+      const aiRecent = $('aiRecent');
+      const aiStatusDot = $('aiStatusDot');
+      const aiStatusLabel = $('aiStatusLabel');
+      const aiRatesHint = $('aiRatesHint');
+
+      document.querySelectorAll('.tab').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document
+            .querySelectorAll('.tab')
+            .forEach((b) => b.classList.remove('active'));
+          document
+            .querySelectorAll('.panel')
+            .forEach((p) => p.classList.remove('active'));
+          btn.classList.add('active');
+          $('panel-' + btn.dataset.tab).classList.add('active');
+          if (btn.dataset.tab === 'ai') loadAiUsage();
+        });
+      });
 
       function setBusy(busy, label) {
         runBtn.disabled = busy;
@@ -271,6 +375,15 @@
         if (v === null || v === undefined) return '—';
         if (typeof v === 'boolean') return v ? 'yes' : 'no';
         return String(v);
+      }
+
+      function money(n) {
+        const x = Number(n);
+        if (!Number.isFinite(x)) return '—';
+        if (x === 0) return '$0';
+        if (x < 0.000001) return `$${x.toExponential(2)}`;
+        if (x < 0.01) return `$${x.toFixed(6)}`;
+        return `$${x.toFixed(4)}`;
       }
 
       function esc(s) {
@@ -355,8 +468,7 @@
         if (last) {
           const { log: _omit, ...rest } = last;
           resultEl.textContent = JSON.stringify(rest, null, 2);
-          statusDot.className =
-            'dot ' + (last.ok === false ? 'bad' : 'ok');
+          statusDot.className = 'dot ' + (last.ok === false ? 'bad' : 'ok');
           statusLabel.textContent = last.coldStart
             ? 'last: cold start'
             : `last: new=${last.newCount ?? 0} sent=${last.sent ?? 0}`;
@@ -399,7 +511,6 @@
 
           const st = await fetch('/api/push-poller', { cache: 'no-store' });
           const status = await st.json();
-          // Prefer POST body (includes this tick's log) + fresh meta counts.
           renderStatus(
             {
               ...status,
@@ -419,8 +530,94 @@
         }
       }
 
+      function renderAi(data) {
+        const s = data.summary || {};
+        const rates = data.rates || {};
+        aiRatesHint.textContent = `Estimate rates: input $${rates.inputPerM ?? '—'}/1M · output $${rates.outputPerM ?? '—'}/1M · window ${data.days}d · rows ${data.totalInRange ?? s.calls ?? 0}${data.truncated ? ' (agg capped at 5000)' : ''}`;
+
+        const cells = [
+          ['calls', s.calls],
+          ['ok', s.okCalls],
+          ['fail', s.failCalls],
+          ['tokens', s.totalTokens],
+          ['prompt tok', s.promptTokens],
+          ['out+think', (s.candidatesTokens || 0) + (s.thoughtsTokens || 0)],
+          ['total USD', money(s.estimatedCostUsd)],
+          ['avg / call', money(s.avgCostUsdPerCall)],
+        ];
+        aiMeta.innerHTML = cells
+          .map(
+            ([k, v]) =>
+              `<div><div class="k">${k}</div><div class="v">${fmt(v)}</div></div>`,
+          )
+          .join('');
+
+        const days = data.byDay || [];
+        aiByDay.innerHTML = days.length
+          ? `<table><thead><tr><th>day</th><th>calls</th><th>cost</th></tr></thead><tbody>${days
+              .map(
+                (d) =>
+                  `<tr><td>${esc(d.day)}</td><td>${d.calls}</td><td>${money(d.costUsd)}</td></tr>`,
+              )
+              .join('')}</tbody></table>`
+          : '<div class="hint">No rows yet. Run AI analyze from the app after deploy.</div>';
+
+        const ex = data.byExchange || [];
+        aiByExchange.innerHTML = ex.length
+          ? `<table><thead><tr><th>exchange</th><th>calls</th><th>cost</th></tr></thead><tbody>${ex
+              .map(
+                (d) =>
+                  `<tr><td>${esc(d.exchange)}</td><td>${d.calls}</td><td>${money(d.costUsd)}</td></tr>`,
+              )
+              .join('')}</tbody></table>`
+          : '—';
+
+        const recent = data.recent || [];
+        aiRecent.innerHTML = recent.length
+          ? `<table><thead><tr><th>at</th><th>ex</th><th>ok</th><th>tok</th><th>cost</th><th>err</th></tr></thead><tbody>${recent
+              .map((r) => {
+                const at = String(r.created_at || '').replace('T', ' ').slice(0, 19);
+                return `<tr>
+                  <td>${esc(at)}</td>
+                  <td>${esc(r.exchange || '—')}</td>
+                  <td>${r.ok ? 'yes' : 'no'}</td>
+                  <td>${r.total_tokens ?? 0}</td>
+                  <td>${money(r.estimated_cost_usd)}</td>
+                  <td>${esc(r.error || '')}</td>
+                </tr>`;
+              })
+              .join('')}</tbody></table>`
+          : '—';
+      }
+
+      async function loadAiUsage() {
+        aiRefreshBtn.disabled = true;
+        aiStatusDot.className = 'dot warn';
+        aiStatusLabel.textContent = 'loading…';
+        try {
+          const days = aiDays.value || '30';
+          const res = await fetch(
+            `/api/dashboard/ai-usage?days=${encodeURIComponent(days)}&limit=50`,
+            { cache: 'no-store' },
+          );
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || res.statusText);
+          renderAi(data);
+          aiStatusDot.className = 'dot ok';
+          aiStatusLabel.textContent = `ok · ${data.summary?.calls ?? 0} calls`;
+        } catch (err) {
+          aiStatusDot.className = 'dot bad';
+          aiStatusLabel.textContent = 'error';
+          aiMeta.innerHTML = `<div class="err">${esc(err.message || err)}</div>`;
+        } finally {
+          aiRefreshBtn.disabled = false;
+        }
+      }
+
       runBtn.addEventListener('click', runPoll);
       refreshBtn.addEventListener('click', loadStatus);
+      aiRefreshBtn.addEventListener('click', loadAiUsage);
+      aiDays.addEventListener('change', loadAiUsage);
       loadStatus();
     </script>
   </body>
