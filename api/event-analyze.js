@@ -18,35 +18,35 @@ function normalizeLanguage(raw) {
 
 function buildSystemPrompt(language) {
   const langName = LANGUAGE_NAMES[language] ?? 'English';
-  return `You explain crypto exchange events and announcements simply for beginners.
+  return `You explain crypto exchange events and announcements for beginners in a scannable, detailed way.
 
 Primary task:
 - ALWAYS use the URL context tool to open and read the Source URL announcement page first (full article body, not just the title).
-- From that page, write a detailed but easy "summary" so the user understands without opening the link.
+- From that page, write a detailed "summary" so the user understands without opening the link.
 - Also fill reward / period / conditions / cautions from the same page.
 
-What to extract into the easy explanation:
-- What the campaign/announcement is
-- Who can join / eligibility
-- Rewards, discounts, pools, or benefits (amounts, tiers, caps if stated)
-- How to participate (steps)
-- Start / end times and any important deadlines
-- Notable cautions (region, KYC, risk, disqualification rules)
+Readability rules for ALL string fields (especially "summary"):
+- Use Markdown the UI can render: blank lines between short paragraphs; **bold** for key facts (dates, %, amounts, tiers, exchange names, deadlines).
+- Prefer short paragraphs (1–2 sentences) over one long block. Use line breaks so it is easy to scan on a phone.
+- You may start a paragraph or bullet with ONE relevant emoji for scanning (examples: 📌 overview, 🎁 reward, 📅 period, ✅ how to join, ⚠️ caution). Do not spam emojis; at most one leading emoji per paragraph/bullet.
+- In "summary", cover: what it is → who/eligibility → rewards → how to join → period/deadlines → key cautions. Keep concrete numbers from the page.
+- "reward" / "period" may also use **bold** and a leading emoji.
+- "conditions" / "cautions": short bullets; bold the critical clause when helpful.
 
 Hard rules:
 - Do NOT give investment advice.
 - Do NOT invent rewards, amounts, dates, or conditions. Only use what appears on the retrieved page (plus the provided title/description/tags as secondary hints).
 - Do NOT tell the user to "check / read / refer to the official announcement" instead of explaining. Put the details in the JSON fields. A short note that terms can change is OK.
 - If URL retrieval fails or the body is unreadable, say what is unknown briefly and fall back to title + description + tags only — still do not invent facts.
-- Write EVERY string value in ${langName} only (language code: ${language}).
+- Write EVERY string value in ${langName} only (language code: ${language}). JSON keys stay in English. Escape newlines in JSON strings properly.
 
 Return a JSON object only:
 {
-  "summary": "4-7 sentence easy explanation in ${langName} with concrete details from the announcement body",
+  "summary": "Markdown multi-paragraph detailed explanation in ${langName}",
   "reward": "reward / benefit summary in ${langName} (empty string if unknown)",
   "period": "period / deadline summary in ${langName} (empty string if unknown)",
-  "conditions": ["participation / eligibility requirement bullets in ${langName}"],
-  "cautions": ["cautions / region / KYC / risk bullets in ${langName}"]
+  "conditions": ["participation / eligibility bullets in ${langName}"],
+  "cautions": ["caution bullets in ${langName}"]
 }`;
 }
 
@@ -134,7 +134,8 @@ export default async function handler(req, res) {
   }
 
   const userPrompt = `Respond in ${LANGUAGE_NAMES[language]} (language=${language}).
-Use the URL context tool to read the Source URL announcement body, then write a detailed easy explanation in "summary" (and the other fields).
+Use the URL context tool to read the Source URL announcement body, then write a detailed explanation in "summary" (and the other fields).
+Format for phone readability: short paragraphs, blank lines, **bold** key facts, optional single leading emoji per paragraph/bullet.
 Do not tell the reader to go read the announcement instead of explaining.
 Title/description/tags are hints only — prefer facts from the retrieved page.
 
