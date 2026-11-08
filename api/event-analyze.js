@@ -1,6 +1,5 @@
 import { requireAppToken } from '../lib/auth.js';
 import { applyCors, handleOptions } from '../lib/cors.js';
-import { fetchAnnouncementText } from '../lib/fetch-announcement-text.js';
 
 const LANGUAGE_NAMES = {
   en: 'English',
@@ -21,23 +20,30 @@ function buildSystemPrompt(language) {
   const langName = LANGUAGE_NAMES[language] ?? 'English';
   return `You explain crypto exchange events and announcements simply for beginners.
 
-Goals:
-- The "summary" field is the main "easy explanation" the user reads first. Make it self-contained and useful.
-- Use the Source URL page text (when provided) together with title/description/tags. Prefer the page text for concrete details (what it is, who can join, what you get, how to join, deadlines).
-- Summarize those details in plain language so the user understands without opening the announcement first.
+Primary task:
+- ALWAYS use the URL context tool to open and read the Source URL announcement page first (full article body, not just the title).
+- From that page, write a detailed but easy "summary" so the user understands without opening the link.
+- Also fill reward / period / conditions / cautions from the same page.
+
+What to extract into the easy explanation:
+- What the campaign/announcement is
+- Who can join / eligibility
+- Rewards, discounts, pools, or benefits (amounts, tiers, caps if stated)
+- How to participate (steps)
+- Start / end times and any important deadlines
+- Notable cautions (region, KYC, risk, disqualification rules)
 
 Hard rules:
 - Do NOT give investment advice.
-- Do NOT invent rewards, amounts, dates, or conditions that are not supported by the provided materials.
-- Do NOT tell the user to "check / read / refer to the official announcement" as a substitute for explaining. Put the explanation in "summary" (and the other fields). You may still note that details can change on the exchange.
-- If the page text is missing or thin, use title + description + tags, and clearly say what is unknown instead of deferring to the URL.
-- If unsure, say what is unclear in one short clause — still give the best plain-language explanation you can from available facts.
+- Do NOT invent rewards, amounts, dates, or conditions. Only use what appears on the retrieved page (plus the provided title/description/tags as secondary hints).
+- Do NOT tell the user to "check / read / refer to the official announcement" instead of explaining. Put the details in the JSON fields. A short note that terms can change is OK.
+- If URL retrieval fails or the body is unreadable, say what is unknown briefly and fall back to title + description + tags only — still do not invent facts.
 - Write EVERY string value in ${langName} only (language code: ${language}).
 
 Return a JSON object only:
 {
-  "summary": "3-6 sentence easy explanation in ${langName}: what this is, why it matters, key reward/period/how-to highlights from the source",
-  "reward": "reward summary in ${langName} (empty string if unknown)",
+  "summary": "4-7 sentence easy explanation in ${langName} with concrete details from the announcement body",
+  "reward": "reward / benefit summary in ${langName} (empty string if unknown)",
   "period": "period / deadline summary in ${langName} (empty string if unknown)",
   "conditions": ["participation / eligibility requirement bullets in ${langName}"],
   "cautions": ["cautions / region / KYC / risk bullets in ${langName}"]
@@ -76,6 +82,7 @@ function parseJsonObject(text) {
  * POST /api/event-analyze
  * Body: { exchange, title, description, tags, url,
  *         startDateTimestamp, endDateTimestamp, language }
+ * Gemini reads the announcement via URL context tool.
  * Env: GEMINI_API_KEY (required)
  */
 const GEMINI_MODEL = 'gemini-3.5-flash-lite';
@@ -126,17 +133,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'title is required' });
   }
 
-  const pageText = url ? await fetchAnnouncementText(url) : '';
-
   const userPrompt = `Respond in ${LANGUAGE_NAMES[language]} (language=${language}).
-Write a self-contained easy explanation in "summary" using the materials below (especially Source page text when present). Do not tell the reader to go read the announcement instead of explaining.
+Use the URL context tool to read the Source URL announcement body, then write a detailed easy explanation in "summary" (and the other fields).
+Do not tell the reader to go read the announcement instead of explaining.
+Title/description/tags are hints only — prefer facts from the retrieved page.
 
 Exchange: ${exchange}
 Title: ${title}
 Tags: ${tags.join(', ')}
 Description: ${description || '(none)'}
-Source URL: ${url || '(none)'}
-Source page text: ${pageText || '(unavailable — explain from title/description/tags only; state unknowns briefly)'}
+Source URL: ${url || '(none — no page to retrieve; use title/description/tags only)'}
 Start (ms): ${payload.startDateTimestamp ?? null}
 End (ms): ${payload.endDateTimestamp ?? null}`;
 
@@ -145,25 +151,30 @@ End (ms): ${payload.endDateTimestamp ?? null}`;
   );
   endpoint.searchParams.set('key', apiKey);
 
+  const requestBody = {
+    systemInstruction: {
+      parts: [{ text: buildSystemPrompt(language) }],
+    },
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: userPrompt }],
+      },
+    ],
+    // Gemini retrieves the announcement body from Source URL.
+    tools: url ? [{ url_context: {} }] : undefined,
+    generationConfig: {
+      temperature: 0.3,
+      responseMimeType: 'application/json',
+    },
+  };
+  if (!requestBody.tools) delete requestBody.tools;
+
   try {
     const geminiRes = await fetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json; charset=utf-8' },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: buildSystemPrompt(language) }],
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: userPrompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.3,
-          responseMimeType: 'application/json',
-        },
-      }),
+      body: JSON.stringify(requestBody),
       signal: AbortSignal.timeout(55_000),
     });
 
@@ -220,7 +231,23 @@ End (ms): ${payload.endDateTimestamp ?? null}`;
       });
     }
 
-    return res.status(200).json({ analysis });
+    const urlContextMeta =
+      candidates[0]?.urlContextMetadata ??
+      candidates[0]?.url_context_metadata ??
+      body.urlContextMetadata ??
+      body.url_context_metadata ??
+      null;
+    if (urlContextMeta) {
+      console.log(
+        '[event-analyze] url_context_metadata',
+        JSON.stringify(urlContextMeta),
+      );
+    }
+
+    return res.status(200).json({
+      analysis,
+      ...(urlContextMeta ? { urlContext: urlContextMeta } : {}),
+    });
   } catch (error) {
     console.error('[event-analyze]', error);
     return res.status(500).json({
