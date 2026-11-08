@@ -1,5 +1,6 @@
 import { requireAppToken } from '../lib/auth.js';
 import { applyCors, handleOptions } from '../lib/cors.js';
+import { fetchAnnouncementText } from '../lib/fetch-announcement-text.js';
 
 const LANGUAGE_NAMES = {
   en: 'English',
@@ -19,14 +20,26 @@ function normalizeLanguage(raw) {
 function buildSystemPrompt(language) {
   const langName = LANGUAGE_NAMES[language] ?? 'English';
   return `You explain crypto exchange events and announcements simply for beginners.
-Do not give investment advice. Do not invent rewards or conditions that are not in the source. If unsure, say so.
-Write EVERY string value in ${langName} only (language code: ${language}).
+
+Goals:
+- The "summary" field is the main "easy explanation" the user reads first. Make it self-contained and useful.
+- Use the Source URL page text (when provided) together with title/description/tags. Prefer the page text for concrete details (what it is, who can join, what you get, how to join, deadlines).
+- Summarize those details in plain language so the user understands without opening the announcement first.
+
+Hard rules:
+- Do NOT give investment advice.
+- Do NOT invent rewards, amounts, dates, or conditions that are not supported by the provided materials.
+- Do NOT tell the user to "check / read / refer to the official announcement" as a substitute for explaining. Put the explanation in "summary" (and the other fields). You may still note that details can change on the exchange.
+- If the page text is missing or thin, use title + description + tags, and clearly say what is unknown instead of deferring to the URL.
+- If unsure, say what is unclear in one short clause — still give the best plain-language explanation you can from available facts.
+- Write EVERY string value in ${langName} only (language code: ${language}).
+
 Return a JSON object only:
 {
-  "summary": "2-4 sentence summary in ${langName}",
+  "summary": "3-6 sentence easy explanation in ${langName}: what this is, why it matters, key reward/period/how-to highlights from the source",
   "reward": "reward summary in ${langName} (empty string if unknown)",
-  "period": "period summary in ${langName} (empty string if unknown)",
-  "conditions": ["participation requirement bullets in ${langName}"],
+  "period": "period / deadline summary in ${langName} (empty string if unknown)",
+  "conditions": ["participation / eligibility requirement bullets in ${langName}"],
   "cautions": ["cautions / region / KYC / risk bullets in ${langName}"]
 }`;
 }
@@ -113,12 +126,17 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'title is required' });
   }
 
+  const pageText = url ? await fetchAnnouncementText(url) : '';
+
   const userPrompt = `Respond in ${LANGUAGE_NAMES[language]} (language=${language}).
+Write a self-contained easy explanation in "summary" using the materials below (especially Source page text when present). Do not tell the reader to go read the announcement instead of explaining.
+
 Exchange: ${exchange}
 Title: ${title}
 Tags: ${tags.join(', ')}
 Description: ${description || '(none)'}
-Source URL: ${url}
+Source URL: ${url || '(none)'}
+Source page text: ${pageText || '(unavailable — explain from title/description/tags only; state unknowns briefly)'}
 Start (ms): ${payload.startDateTimestamp ?? null}
 End (ms): ${payload.endDateTimestamp ?? null}`;
 
